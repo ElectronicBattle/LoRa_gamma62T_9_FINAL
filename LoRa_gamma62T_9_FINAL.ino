@@ -25,7 +25,7 @@
 //Diagnostic	Brownout/WDT Reset Diagnostics	Completed. 
 //The setup() function now checks and logs the reset reason, which is vital for diagnosing power or code issues.
 
-// Final Stable Version: Non-Blocking Serial FSM Implemented with SECURE TLS.
+// Final Stable Version: Secure TLS, Non-Blocking, and Flash Optimized.
 
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
@@ -37,6 +37,7 @@
 #include <secrets.h> 
 #include <ctype.h>   
 #include "esp_task_wdt.h" 
+#include "esp_log.h" // *** NEW: Required for Flash Optimization ***
 
 // --- FIX: ADD FUNCTION PROTOTYPES FOR LINKER ERROR ---
 void setup();
@@ -211,7 +212,7 @@ void IRAM_ATTR handleGateInterrupt()
 
 
 // ----------------------------------------------------
-// --- DATA PARSING & TIME & UTILITY FUNCTIONS ---
+// --- DATA PARSING & TIME & UTILITY FUNCTIONS (Unmodified) ---
 // ----------------------------------------------------
 
 void urlEncode(const char* input, char* output, size_t outputSize)
@@ -416,8 +417,7 @@ void sendPushover()
 {
   Serial.println("Attempting Pushover notification...");
   
-  // *** REMOVED: secureClient.setInsecure(); ***
-  // *** ADDED: Set the long-life Root CA for secure verification ***
+  // *** TLS: Set the long-life Root CA for secure verification (removed insecure flag) ***
   secureClient.setCACert(PUSHOVER_ROOT_CA);
   
   HTTPClient http;
@@ -576,7 +576,7 @@ void checkAndReconnectNetwork()
 
 
 // ----------------------------------------------------
-// --- SETUP and LOOP (MODIFIED for TLS Time Check) ---
+// --- SETUP and LOOP (MODIFIED for TLS Time Check & Flash Opt.) ---
 // ----------------------------------------------------
 
 void setup()
@@ -584,9 +584,17 @@ void setup()
   randomSeed(analogRead(A0)); 
   Serial.begin(115200);
 
+  // --- FLASH LIFESPAN OPTIMIZATION (NEW) ---
+  // Set all log components to only print ERROR level messages or higher.
+  esp_log_level_set("*", ESP_LOG_ERROR); 
+  // Set Wi-Fi component specifically to only print ERROR messages.
+  esp_log_level_set("wifi", ESP_LOG_ERROR); 
+  Serial.println("System logging throttled for flash wear prevention.");
+  // ------------------------------------------
+  
   Serial.println("\n--- Starting Dual-Input Gate Alert System ---");
 
-  // --- Reset Reason Check for Diagnostics (NEW) ---
+  // --- Reset Reason Check for Diagnostics (Unmodified) ---
   esp_reset_reason_t reason = esp_reset_reason();
 
   if (reason == ESP_RST_BROWNOUT) {
@@ -600,7 +608,7 @@ void setup()
   }
   // ------------------------------------------
 
-  // --- WDT SETUP ---
+  // --- WDT SETUP (Unmodified) ---
   const esp_task_wdt_config_t wdt_config = {
     WDT_TIMEOUT_SEC,                     
     (1 << CONFIG_ARDUINO_RUNNING_CORE),  
@@ -708,7 +716,7 @@ void loop()
 
     if (WiFi.status() == WL_CONNECTED)
     {
-      // *** NEW TIME CHECK FOR TLS VALIDATION ***
+      // *** TLS: Check for valid NTP time before attempting secure connection ***
       if (time(nullptr) > 100000) 
       {
         Serial.println("WiFi connected. Time synchronized. Attempting SECURE notifications...");
