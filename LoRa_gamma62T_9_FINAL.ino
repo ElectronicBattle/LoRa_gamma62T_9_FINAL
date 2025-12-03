@@ -504,7 +504,7 @@ void sendPushover()
 
   // Build the message content (which is URL-encoded later)
   snprintf(messageContent, sizeof(messageContent), 
-           "%s%s %.1f dBm %s (%.2f V)",
+           "%s%s\n%.1f dBm %s (%.2f V)",
            statusPrefix,
            current_data.timestamp,
            current_data.rssi_dbm,
