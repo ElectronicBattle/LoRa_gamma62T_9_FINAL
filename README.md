@@ -1,4 +1,4 @@
-# LoRa_gamma62T_9_FINAL
+# LoRa_gamma62T
 // DFRobot FireBeetle 2 ESP32-E (DFR0654) - IoT Gate Alert System
 
 //WDT & System	Watchdog Timer (WDT) Implementation	Completed. 
