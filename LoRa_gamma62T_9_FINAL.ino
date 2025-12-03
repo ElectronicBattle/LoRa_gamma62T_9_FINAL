@@ -500,7 +500,7 @@ void sendPushover()
   http.setTimeout(4000); 
 
   char messageContent[MESSAGE_BUF_SIZE];
-  const char* statusPrefix = (strcmp(current_data.status, "OPEN") == 0) ? "Blue Gate OPEN @ " : "Blue Gate CLOSED @ ";
+  const char* statusPrefix = (strcmp(current_data.status, "OPEN") == 0) ? "OPEN @ " : "CLOSED @ ";
 
   // Build the message content (which is URL-encoded later)
   snprintf(messageContent, sizeof(messageContent), 
