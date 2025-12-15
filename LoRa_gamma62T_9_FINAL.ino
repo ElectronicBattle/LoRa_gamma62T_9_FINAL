@@ -57,7 +57,7 @@ byte packet_buffer[PACKET_SIZE] = { 0 };
 
 // --- NEW DEFINITIONS FOR LOGGING & HTTP SERVER ---
 const char* LOG_FILE = "/events.log";
-const char* LOG_OLD_FILE = "/events.old"; // NEW: For log rotation
+const char* LOG_OLD_FILE = "/events.old"; 
 #define LOG_MESSAGE_SIZE 128
 #define MAX_LOG_SIZE_KB 500 // 500 KB maximum before rotation
 // ------------------------------------
@@ -71,7 +71,7 @@ const char* LOG_OLD_FILE = "/events.old"; // NEW: For log rotation
 // ----------------------------------------------------
 
 // ----------------------------------------------------
-// --- GLOBAL OBJECTS & STATE MANAGEMENT ---
+// --- GLOBAL OBJECTS & STATE MANAGEMENT (CORRECTED) ---
 // ----------------------------------------------------
 
 WiFiClient espClient;
@@ -79,20 +79,49 @@ WiFiClientSecure secureClient;
 PubSubClient mqttClient(espClient);
 WebServer server(80); // HTTP Server Object
 
-// --- GLOBAL VARIABLES ... (Existing) ---
+// --- GLOBAL VARIABLES FOR NON-BLOCKING RECONNECT ---
 const unsigned long RECONNECT_INTERVAL_MS = 5000; 
 unsigned long last_reconnect_attempt_ms = 0;
 bool is_online_mode = false; 
+
+// --- NEW AUTO-REBOOT COUNTER ---
 const int MAX_RECONNECT_FAILURES = 10;
 int reconnect_fail_count = 0; 
+
+// --- GLOBAL VARIABLES FOR NON-BLOCKING BLINK ---
 volatile unsigned long blink_stop_time_ms = 0; 
 volatile int blink_source_pin = -1;            
 volatile int blink_sink_pin = -1;              
+
+// --- NEW GLOBAL VARIABLES FOR SERIAL FSM ---
 volatile bool packet_ready = false;  
 volatile size_t packet_index = 0;    
 const unsigned long SERIAL_TIMEOUT_MS = 500; 
 unsigned long packet_start_time = 0; 
-// ... (Event Queue Struct and Globals remain unchanged)
+// -------------------------------------------
+
+// --- ISR AND QUEUE MANAGEMENT (WAS MISSING) ---
+// Structure to store a single event
+struct Event
+{
+  char status[STATUS_SIZE];
+  char source[STATUS_SIZE];
+};
+
+// Define the queue size
+#define MAX_QUEUE_SIZE 5 
+volatile Event event_queue[MAX_QUEUE_SIZE];
+volatile int queue_head = 0;
+volatile int queue_tail = 0;
+
+// Volatile variables to hold the last stable state read by the ISR
+volatile int isr_button_state = HIGH;
+volatile int isr_sensor_state = HIGH;
+
+// Debouncing and timing
+volatile unsigned long last_interrupt_time = 0;
+const unsigned long DEBOUNCE_DELAY_MS = 25;
+// -----------------------------------------------
 
 struct GateData
 {
@@ -106,7 +135,7 @@ struct GateData
 
 
 // ----------------------------------------------------
-// --- INTERRUPT HANDLER (Unmodified) ---
+// --- INTERRUPT HANDLER (Now working with defined globals) ---
 // ----------------------------------------------------
 
 void IRAM_ATTR handleGateInterrupt()
@@ -163,7 +192,7 @@ void IRAM_ATTR handleGateInterrupt()
 // ----------------------------------------------------
 // --- DATA PARSING & TIME & UTILITY FUNCTIONS (Unmodified) ---
 // ----------------------------------------------------
-
+// ... (urlEncode, serialReadHandler, parseGammaData, getTimestamp remain unchanged) ...
 void urlEncode(const char* input, char* output, size_t outputSize)
 {
   size_t input_len = strlen(input);
@@ -465,7 +494,7 @@ void initWebServer() {
 // ----------------------------------------------------
 // --- MQTT FUNCTIONS (Unmodified) ---
 // ----------------------------------------------------
-
+// ... (reconnectMQTT, publishMQTTSimpleValue, publishMQTTEvent remain unchanged) ...
 void reconnectMQTT()
 {
   if (WiFi.status() != WL_CONNECTED) return;
@@ -536,7 +565,7 @@ void publishMQTTEvent()
 // ----------------------------------------------------
 // --- PUSHOVER FUNCTIONS (MODIFIED with Logging) ---
 // ----------------------------------------------------
-
+// ... (sendPushover remains unchanged) ...
 void sendPushover()
 {
   Serial.println("Attempting Pushover notification...");
@@ -626,7 +655,7 @@ void sendPushover()
 // ----------------------------------------------------
 // --- NON-BLOCKING LED BLINK FUNCTIONS (Unmodified) ---
 // ----------------------------------------------------
-
+// ... (initBlink, blinkHandler remain unchanged) ...
 void initBlink(int sourcePin, int sinkPin)
 {
   blink_source_pin = sourcePin;
@@ -657,7 +686,7 @@ void blinkHandler()
 
 
 // ----------------------------------------------------
-// --- NON-BLOCKING NETWORK MANAGEMENT (MODIFIED with Logging) ---
+// --- NON-BLOCKING NETWORK MANAGEMENT (MODIFIED with Server Stop/Start) ---
 // ----------------------------------------------------
 
 void checkAndReconnectNetwork()
@@ -792,6 +821,7 @@ void setup()
   digitalWrite(LED_DRIVER_A, LOW);
   digitalWrite(LED_DRIVER_B, LOW);
 
+  // Initialize ISR states with current pin readings (THIS IS WHERE THE ERROR WAS)
   isr_button_state = digitalRead(BUTTON_PIN);
   isr_sensor_state = digitalRead(SENSOR_PIN);
 
@@ -817,6 +847,7 @@ void setup()
   attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), handleGateInterrupt, CHANGE);
   attachInterrupt(digitalPinToInterrupt(SENSOR_PIN), handleGateInterrupt, CHANGE);
 
+  // Re-initialize ISR states after setting up interrupts (redundant but safe)
   isr_button_state = digitalRead(BUTTON_PIN);
   isr_sensor_state = digitalRead(SENSOR_PIN);
 }  
