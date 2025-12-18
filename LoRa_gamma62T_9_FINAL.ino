@@ -335,7 +335,8 @@ void checkAndReconnectNetwork() {
     if (!is_online_mode) {
       logToLittleFS("NET: ONLINE MODE RESTORED.");
       // INJECTION 1: Explicit Multi-Server NTP Request on Reconnect
-      configTime(0, 0, "pool.ntp.org", "time.google.com", "time.nist.gov");
+      // 1. Router (Local) | 2. NPL (UK) | 3. Pool (Global Fallback)
+      configTime(0, 0, "192.168.1.1", "ntp1.npl.co.uk", "pool.ntp.org");
       initWebServer();
       is_online_mode = true;
     }
